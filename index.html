@@ -349,13 +349,31 @@
         if(v !== 'scanner' && scanner) detenerCamara();
       }
 
-      // --- COMUNICACIÓN CON LA NUEVA API (FETCH) ---
+// --- COMUNICACIÓN CON LA NUEVA API (FETCH) ---
       function loadData() {
-        if(API_URL.includes("PEGAR_AQUI")) {
-            showToast("https://script.google.com/macros/s/AKfycbwdRRXl1b8e1pfFg6LpjmGigCAjWXOht0q66AQdVyRk-CY1CN-e2UbyTYAN4Qc1dKlrsA/exec", "error");
-            document.getElementById('loader').style.display='none';
-            return;
-        }
+        // Mostramos el spinner de carga
+        document.getElementById('loader').style.display='flex';
+
+        // Llamada directa a tu API en Apps Script
+        fetch(API_URL + "?action=obtenerDatosInventario")
+          .then(res => res.json())
+          .then(res => {
+             document.getElementById('loader').style.display='none';
+             if(res.status === 'success') {
+                 DB = res.data;
+                 renderTable();
+                 updateSelects(); 
+                 showToast("Inventario actualizado", "success");
+             } else {
+                 showToast("Error en base de datos: " + res.message, "error");
+             }
+          })
+          .catch(err => {
+             document.getElementById('loader').style.display='none';
+             showToast("Sin conexión con la API. Verifica los permisos.", "error");
+             console.error("Error de fetch:", err);
+          });
+      }
 
         document.getElementById('loader').style.display='flex';
         fetch(API_URL + "?action=obtenerDatosInventario")
@@ -627,3 +645,4 @@
   </body>
 
 </htmle
+
