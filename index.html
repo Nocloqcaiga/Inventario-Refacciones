@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventario V4.1 - Refacciones</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    
+    <style>
+      :root { --primary: #003057; --accent: #ffb300; --bg: #f4f4f4; --success: #2e7d32; --danger: #c62828; }
+      body { font-family: 'Roboto', sans-serif; background: var(--bg); margin: 0; padding-bottom: 80px; color:#222; user-select: none; }
+      
+      nav { background: white; padding: 0 5px; display: flex; justify-content: space-between; gap: 2px; position: sticky; top:0; z-index:100; box-shadow:0 2px 5px rgba(0,0,0,0.05); overflow-x: auto; }
+      .nav-btn { flex: 1; min-width: 60px; background: none; border: none; padding: 10px 2px; cursor: pointer; color: #666; display: flex; flex-direction: column; align-items: center; border-bottom: 3px solid transparent; font-size: 0.65rem; }
+      .nav-btn i { font-size: 1.4rem; margin-bottom: 4px; }
+      .nav-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #f0f4f8; }
+
+      .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; display: none; }
+      .container.active { display: block; animation: fade 0.3s; }
+      @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+      .card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
+
+      .table-responsive { overflow-x: auto; font-size: 0.85rem; border: 1px solid #ddd; border-radius: 4px; max-height: 75vh; }
+      table { width: 100%; border-collapse: collapse; min-width: 1100px; }
+      th { background: #e0e0e0; padding: 12px; text-align: left; border-bottom: 2px solid #bbb; white-space: nowrap; font-weight: 700; color: #000; position: sticky; top: 0; z-index: 10; }
+      td { padding: 8px 12px; border-bottom: 1px solid #eee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+      tr:hover { background: #f9f9f9; }
+      
+      .stock-low { color: var(--danger); font-weight: bold; background: #ffebee; padding: 2px 6px; border-radius: 4px; }
+      .col-check { width: 30px; text-align: center; }
+
+      #fab-add { position: fixed; bottom: 80px; right: 20px; background: var(--accent); color: #000; padding: 15px 25px; border-radius: 50px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; align-items: center; gap: 10px; font-weight: bold; cursor: pointer; z-index: 99; animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+      @keyframes popUp { from { transform: scale(0); } to { transform: scale(1); } }
+
+      .split-view { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+      @media(max-width: 768px) { .split-view { grid-template-columns: 1fr; } }
+      
+      .queue-item { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; }
+      .queue-item:hover { background: #f5f5f5; }
+      .queue-item.selected { background: #e3f2fd; border-left: 5px solid var(--primary); font-weight:bold; }
+
+      .label-preview-box { border: 2px solid #333; border-radius: 8px; padding: 20px; text-align: center; background: white; width: 220px; margin: 0 auto; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+      .preview-name { font-weight: 900; font-size: 1.1rem; margin-bottom: 10px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 5px; word-break: break-word; line-height: 1.2; }
+
+      .map-container { position: relative; display: inline-block; width: 100%; border: 4px solid white; border-radius: 8px; overflow: hidden; background: #333; }
+      .map-pin { position: absolute; width: 24px; height: 24px; background-color: #f44336; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10; cursor: pointer; }
+      .map-pin::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #f44336; }
+      .pin-pulse { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; border-radius: 50%; background: rgba(244, 67, 54, 0.6); animation: pulse-animation 2s infinite; z-index: -1; }
+      @keyframes pulse-animation { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(3.5); opacity: 0; } }
+
+      #print-grid { display: none; }
+      @media print {
+        body * { visibility: hidden; }
+        @page { size: letter; margin: 5mm; } 
+        #print-grid, #print-grid * { visibility: visible; }
+        #print-grid { position: absolute; left: 0; top: 0; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; row-gap: 20px; }
+        .print-label-card { border: 2px solid #000; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; height: 200px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; overflow: hidden; box-sizing: border-box; }
+        .print-name { font-size: 12px; font-weight: 900; text-transform: uppercase; margin-bottom: 5px; padding-bottom: 5px; line-height: 1.1; color: #000; width: 100%; border-bottom: 2px solid #000; max-height: 40px; overflow: hidden; }
+        .print-qr { flex-grow: 1; display: flex; align-items: center; justify-content: center; margin: 5px 0; }
+        .print-qr img { width: 110px !important; height: 110px !important; }
+        .print-id { font-size: 10px; color: #333; font-weight: bold; margin-top: 5px; width: 100%; }
+      }
+
+      .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+      .modal-box { background: white; padding: 5px; border-radius: 8px; width: 95%; max-width: 800px; height: auto; max-height: 90vh; position: relative; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+      .modal-content-area { flex: 1; background: #222; border-radius: 4px; overflow: auto; display: flex; justify-content: center; align-items: center; min-height: 300px; padding: 10px; }
+      .modal-content-area img { max-width: 100%; max-height: 80vh; object-fit: contain; }
+      .close-modal-btn { position: absolute; top: -15px; right: -15px; background: var(--danger); color: white; border: 2px solid white; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 2010; }
+
+      input:not([type="checkbox"]), select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; font-size: 1rem; }
+      .input-helper { font-size: 0.75rem; color: #666; margin-top: -8px; margin-bottom: 15px; display: block; padding-left: 2px; }
+      .required-border { border-left: 4px solid var(--primary) !important; }
+
+      .btn { width: 100%; padding: 12px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; color: white; background: var(--primary); font-size: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+      .btn-success { background: var(--success); } .btn-danger { background: var(--danger); } .btn-outline { background: white; color: #555; border: 1px solid #ccc; box-shadow: none; }
+      .btn-sm { padding: 5px 10px; font-size: 0.8rem; width: auto; margin-left: 10px; }
+
+      #scan-card { display: none; background: white; border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); margin-top: -10px; border-top: 5px solid var(--primary); }
+      .info-row { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 8px 0; }
+
+      #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 4000; left: 50%; bottom: 80px; transform: translateX(-50%); font-size: 1rem; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+      #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+      @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 80px; opacity: 1;} }
+      @keyframes fadeout { from {bottom: 80px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+      #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:999; display:flex; justify-content:center; align-items:center; }
+      .spinner { width: 40px; height: 40px; border: 5px solid #eee; border-top: var(--primary) 5px solid; border-radius: 50%; animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+
+    <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--primary); z-index:3000; display:flex; justify-content:center; align-items:center;">
+        <div style="background:white; padding:30px; border-radius:8px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2); width:90%; max-width:350px;">
+            <i class="material-icons" style="font-size:48px; color:var(--primary); margin-bottom:10px;">lock</i>
+            <h2 style="margin-top:0; color:#333;">Acceso Restringido</h2>
+            <p style="color:#666; font-size:0.9rem; margin-bottom:20px;">Ingrese el PIN para acceder al inventario</p>
+            <input type="password" id="pin-input" placeholder="••••" style="font-size:1.5rem; text-align:center; letter-spacing:5px; margin-bottom:15px;" onkeypress="if(event.key === 'Enter') checkPin()">
+            <button class="btn" onclick="checkPin()">Desbloquear</button>
+        </div>
+    </div>
+
+    <div id="loader"><div class="spinner"></div></div>
+    <div id="toast">Notificación</div>
+    
+    <div id="media-modal" class="modal-overlay" onclick="if(event.target === this) cerrarModal()">
+        <div class="modal-box">
+            <button class="close-modal-btn" onclick="cerrarModal()">×</button>
+            <div id="modal-content" class="modal-content-area"></div>
+        </div>
+    </div>
+
+    <div id="fab-add" onclick="agregarSeleccionACola()">
+      <i class="material-icons">playlist_add</i>
+      <span id="fab-text">Agregar</span>
+    </div>
+
+    <nav>
+      <button class="nav-btn active" onclick="nav('consultas', this)"><i class="material-icons">list</i>Inventario</button>
+      <button class="nav-btn" onclick="nav('qr', this)"><i class="material-icons">qr_code</i>Etiquetas</button>
+      <button class="nav-btn" onclick="nav('scanner', this)"><i class="material-icons">qr_code_scanner</i>Escanear</button>
+      <button class="nav-btn" onclick="nav('movs', this)"><i class="material-icons">sync_alt</i>Mover</button>
+      <button class="nav-btn" onclick="nav('alta', this)"><i class="material-icons">add_box</i>Alta</button>
+    </nav>
+
+    <div id="view-consultas" class="container active">
+      <div class="card">
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="search" placeholder="Buscar refacción..." onkeyup="filtrarTabla()" style="margin:0;">
+          <button class="btn btn-success" style="width:auto;" onclick="exportar()"><i class="material-icons">download</i></button>
+          <button class="btn" style="width:auto;" onclick="loadData()"><i class="material-icons">refresh</i></button>
+        </div>
+        <br>
+        <div class="table-responsive">
+          <table id="tabla-main"><thead></thead><tbody></tbody></table>
+          <div id="no-data" style="text-align:center; padding:20px; display:none; color:#888;">Sin datos.</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-qr" class="container">
+      <div class="card">
+        <h3>Administrador de Etiquetas</h3>
+        <div class="split-view">
+            <div>
+                <div style="background:#f9f9f9; padding:10px; border-radius:6px; border:1px solid #eee; margin-bottom:15px;">
+                    <label style="font-size:0.8rem; font-weight:bold; color:#555;">Agregar a la cola:</label>
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <select id="qr-manual-select" style="margin:0; font-size:0.9rem;"></select>
+                        <button class="btn" style="width:auto; padding:0 15px;" onclick="agregarManualACola()"><i class="material-icons">add</i></button>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <strong>Cola (<span id="queue-count">0</span>)</strong>
+                    <button class="btn btn-danger btn-sm" onclick="limpiarCola()">Borrar Todo</button>
+                </div>
+                <div id="queue-list" style="max-height:300px; overflow-y:auto; border:1px solid #ddd; background:#fff;">
+                    <div style="padding:10px; color:#999; text-align:center;">Lista vacía</div>
+                </div>
+                <br>
+                <button class="btn" onclick="imprimirCola()"><i class="material-icons" style="vertical-align:middle;">print</i> Imprimir Todo</button>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; background:#fafafa; padding:20px; border-radius:8px;">
+                <h4 style="margin-top:0; color:#666;">Vista Previa</h4>
+                <div id="preview-box" class="label-preview-box" style="display:none;">
+                    <div id="prev-name" class="preview-name">PRODUCTO</div>
+                    <div id="prev-qr" style="display:flex; justify-content:center; margin:10px 0;"></div>
+                    <div style="font-size:0.8rem; margin-top:5px; color:#555;">ID: <span id="prev-id"></span></div>
+                </div>
+                <div id="preview-placeholder" style="color:#aaa; font-style:italic; text-align:center; padding:20px;">
+                    <i class="material-icons" style="font-size:40px; color:#ddd;">visibility</i><br>Selecciona un item
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-scanner" class="container">
+      <div class="card" style="text-align:center;">
+        <h3>Escanear</h3>
+        <div id="reader" style="width:100%; border-radius:4px; overflow:hidden; background:#000;"></div>
+        <div id="scan-controls" style="margin-top:15px;">
+          <button id="btn-scan" class="btn" onclick="iniciarCamara()">Activar Cámara</button>
+          <button id="btn-stop" class="btn btn-danger" onclick="detenerCamara()" style="display:none;">Detener</button>
+        </div>
+      </div>
+      <div id="scan-card">
+        <h3 id="card-name" style="margin:0; color:var(--primary); font-size:1.3rem; text-align:center;">-</h3>
+        <p style="text-align:center; color:#666; margin:5px 0;" id="card-id">-</p>
+        
+        <div style="background:#f5f5f5; padding:15px; border-radius:8px; margin:15px 0; text-align:center;">
+             <small>STOCK DISPONIBLE</small><br><strong id="card-stock" style="font-size:2rem;">...</strong>
+        </div>
+        <div class="info-row"><span>Ubicación:</span><strong id="card-loc" style="font-size:0.9rem;">...</strong></div>
+        
+        <div style="margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+            <input id="scan-solicitante" placeholder="¿Quién solicita? (Opcional)" style="margin-bottom:5px; font-size:0.9rem;">
+            <input id="scan-uso" placeholder="¿Para qué máquina/uso? (Opcional)" style="margin-bottom:5px; font-size:0.9rem;">
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin:15px 0;">
+            <button class="btn btn-outline" style="width:50px;" onclick="adjCant(-1)">-</button>
+            <input type="number" id="scan-qty" value="1" min="1" style="width:80px; text-align:center; margin:0; font-size:1.2rem;">
+            <button class="btn btn-outline" style="width:50px;" onclick="adjCant(1)">+</button>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button id="btn-in" class="btn btn-success" onclick="registrarDesdeScanner('entrada', this)" disabled>Entrada (+)</button>
+          <button id="btn-out" class="btn btn-danger" onclick="registrarDesdeScanner('salida', this)" disabled>Salida (-)</button>
+        </div>
+        
+        <div style="margin-top:15px; text-align:center;">
+           <a id="link-datasheet" href="#" target="_blank" style="display:none; color:#003057; text-decoration:underline;">
+               <i class="material-icons" style="vertical-align:middle; font-size:18px;">picture_as_pdf</i> Ver Datasheet/Manual
+           </a>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-movs" class="container">
+      <div class="card" style="max-width:500px; margin:0 auto;">
+        <h3>Movimiento Manual</h3>
+        <label>Producto:</label>
+        <select id="mov-select" onchange="updStockManual()"></select>
+        <div style="text-align:center; background:#e8eaf6; padding:15px; border-radius:4px; margin:15px 0;">
+          <small style="color:#555;">STOCK ACTUAL (BD)</small><br><strong id="mov-stock" style="font-size:2rem; color:var(--primary);">-</strong>
+        </div>
+        <label>Cantidad:</label>
+        <input type="number" id="mov-qty" value="1" min="1" style="text-align:center;">
+        
+        <div style="background:#fafafa; padding:10px; border-radius:4px; margin-bottom:15px; border:1px solid #eee;">
+            <input id="mov-solicitante" placeholder="Solicitante (Ej. Juan Perez)" style="margin-bottom:5px; font-size:0.9rem;">
+            <input id="mov-uso" placeholder="Destino (Ej. Mtto Preventivo)" style="margin-bottom:0; font-size:0.9rem;">
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-success" onclick="registrarManual('entrada')">Entrada (+)</button>
+          <button class="btn btn-danger" onclick="registrarManual('salida')">Salida (-)</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-alta" class="container">
+      <div class="card">
+        <h3>Alta de Refacción</h3>
+        <form onsubmit="handleAlta(event)">
+           <input name="Nombre" placeholder="Nombre del Artículo (Ej. Relevador 24V)" required class="required-border">
+           <span class="input-helper" style="color:#003057; font-weight:bold;">* Campo Obligatorio</span>
+           <input type="number" name="stock" placeholder="Cantidad Inicial (Stock)" required class="required-border">
+           <span class="input-helper" style="color:#003057; font-weight:bold;">* Campo Obligatorio</span>
+           <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+           <input name="ID_Ternium" placeholder="ID Ternium / Código">
+           <span class="input-helper">* Si es Compra Directa o no tiene código, pon "Pendiente" o déjalo vacío.</span>
+           <input name="Numero_de_Parte" placeholder="Número de Parte (Fabricante)">
+           <span class="input-helper">* Opcional. Útil para reordenar.</span>
+           <input name="Proveedor" placeholder="Proveedor Sugerido">
+           <span class="input-helper">* Opcional.</span>
+           <input type="number" name="STOCK_MINIMO" placeholder="Stock Mínimo (Alerta)">
+           <span class="input-helper">* Opcional. Si no pones nada, no habrá alertas.</span>
+           <input type="number" name="COSTO" step="0.01" placeholder="Costo Unitario ($)">
+           <span class="input-helper">* Opcional. Si no tienes el dato, pon 0.</span>
+           
+           <label style="font-size:0.9rem; font-weight:bold;">Ubicación Física</label>
+           <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">
+               <select name="Cuarto_de_Refaccion" id="alta-cuarto" required style="background-color:#fff;" onchange="actualizarGabinetes()">
+                  <option value="" disabled selected>-- Cuarto --</option>
+                  <option value="Cuarto 1">Cuarto 1</option>
+                  <option value="Cuarto Guardias">Cuarto Guardias</option>
+                  <option value="Sala 6">Sala 6</option>
+                  <option value="Cuarto soldadora">Cuarto soldadora</option>
+               </select>
+               <select name="Gabinete" id="alta-gabinete" style="background-color:#fff;">
+                  <option value="" disabled selected>-- Gabinete --</option>
+               </select>
+               <input name="Locacion" placeholder="Loc (Ej. A1)">
+           </div>
+           
+           <input name="DATASHEET" placeholder="Link de PDF / Manual">
+           <span class="input-helper">* Opcional.</span>
+           <br>
+           <button class="btn">Guardar Nuevo Artículo</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="print-grid"></div>
+
+    <script>
+      // ==========================================
+      // CONFIGURACIÓN DE SEGURIDAD Y CONEXIÓN
+      // ==========================================
+      const API_URL = "PEGAR_AQUI_TU_LINK_DE_APPS_SCRIPT"; 
+      const PIN_ACCESO = "1509";
+
+      let DB = [];
+      let scanner = null;
+      let scannedIdx = -1;
+      let printQueue = [];
+      
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      function beep() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.connect(g); g.connect(audioCtx.destination);
+        o.type = 'square'; o.frequency.setValueAtTime(880, audioCtx.currentTime);
+        g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        o.start(); o.stop(audioCtx.currentTime + 0.1);
+      }
+
+      function showToast(msg, type="neutral") {
+        const x = document.getElementById("toast");
+        x.innerText = msg;
+        x.style.backgroundColor = type === 'error' ? '#c62828' : (type==='success' ? '#2e7d32' : '#333');
+        x.className = "show";
+        setTimeout(() => { x.className = x.className.replace("show", ""); }, 4000);
+      }
+
+      // --- LÓGICA DE BLOQUEO (PIN) ---
+      window.onload = function() {
+        if(sessionStorage.getItem('auth') === 'true') {
+            document.getElementById('login-overlay').style.display = 'none';
+            loadData();
+        } else {
+            document.getElementById('loader').style.display = 'none';
+        }
+      };
+
+      function checkPin() {
+          const input = document.getElementById('pin-input').value;
+          if(input === PIN_ACCESO) {
+              sessionStorage.setItem('auth', 'true');
+              document.getElementById('login-overlay').style.display = 'none';
+              loadData();
+          } else {
+              showToast("PIN Incorrecto", "error");
+              document.getElementById('pin-input').value = "";
+          }
+      }
+
+      function nav(v, btn) {
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+        document.getElementById('view-'+v).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if(v !== 'scanner' && scanner) detenerCamara();
+      }
+
+      // --- COMUNICACIÓN CON LA NUEVA API (FETCH) ---
+      function loadData() {
+        if(API_URL.includes("PEGAR_AQUI")) {
+            showToast("https://script.google.com/macros/s/AKfycbwdRRXl1b8e1pfFg6LpjmGigCAjWXOht0q66AQdVyRk-CY1CN-e2UbyTYAN4Qc1dKlrsA/exec", "error");
+            document.getElementById('loader').style.display='none';
+            return;
+        }
+
+        document.getElementById('loader').style.display='flex';
+        fetch(API_URL + "?action=obtenerDatosInventario")
+          .then(res => res.json())
+          .then(res => {
+             document.getElementById('loader').style.display='none';
+             if(res.status === 'success') {
+                 DB = res.data;
+                 renderTable();
+                 updateSelects(); 
+             } else {
+                 showToast("Error cargando base: " + res.message, "error");
+             }
+          }).catch(err => {
+             document.getElementById('loader').style.display='none';
+             showToast("Error de conexión a la API", "error");
+          });
+      }
+
+      function updateSelects() {
+          const opts = '<option value="">-- Seleccionar --</option>' + 
+            DB.map((x,i) => `<option value="${i}">${x.NOMBRE} (${x.ID_TERNIUM})</option>`).join('');
+          document.getElementById('mov-select').innerHTML = opts;
+          document.getElementById('qr-manual-select').innerHTML = opts; 
+      }
+
+      function renderTable() {
+        const t = document.querySelector('#tabla-main tbody');
+        const thead = document.querySelector('#tabla-main thead');
+        
+        if(!DB.length) { document.getElementById('no-data').style.display='block'; return; }
+        document.getElementById('no-data').style.display='none';
+
+        thead.innerHTML = `<tr>
+            <th class="col-check"><input type="checkbox" id="select-all" onclick="toggleSelectAll(this)"></th>
+            <th>Código Almacen</th>
+            <th>Nombre</th>
+            <th>No. Parte</th>
+            <th>Stock</th>
+            <th>Ubicación</th>
+            <th>Marca</th>
+            <th>Info</th>
+        </tr>`;
+        
+        t.innerHTML = DB.map((r, i)=> {
+           const stockVal = parseInt(r.STOCK_ACTUAL || 0);
+           const minVal = parseInt(r.STOCK_MINIMO || 0);
+           const stockClass = (minVal > 0 && stockVal <= minVal) ? 'stock-low' : 'stock-ok';
+           let extras = "";
+           
+           if(r.DATASHEET && r.DATASHEET.length > 4) {
+               extras += `<a href="${r.DATASHEET}" target="_blank" title="Ver Manual" style="margin-right:5px; text-decoration:none;"><i class="material-icons" style="font-size:18px; color:#d32f2f; vertical-align:middle;">picture_as_pdf</i></a>`;
+           }
+           if(r.IMAGEN && r.IMAGEN.length > 4) {
+               extras += `<span onclick="verArchivo('${r.IMAGEN}')" title="Ver Foto" style="cursor:pointer; margin-right:5px;"><i class="material-icons" style="font-size:18px; color:#0288d1; vertical-align:middle;">image</i></span>`;
+           }
+           if(r.GABINETE && r.GABINETE.toString().trim() !== "-" && r.GABINETE.toString().trim() !== "") {
+               extras += `<span onclick="verUbicacion('${r.CUARTO_DE_REFACCION || 'Gral'}', '${r.GABINETE}')" title="Ubicar en Mapa" style="cursor:pointer;"><i class="material-icons" style="font-size:18px; color:#2e7d32; vertical-align:middle;">place</i></span>`;
+           }
+           
+           return `<tr>
+            <td class="col-check"><input type="checkbox" class="row-checkbox" data-idx="${i}" onclick="updateFab()"></td>
+            <td style="font-weight:bold; font-size:0.8rem;">${r.ID_TERNIUM}</td>
+            <td title="${r.NOMBRE}">${r.NOMBRE}</td>
+            <td style="font-size:0.8rem;">${r.NUMERO_DE_PARTE || '-'}</td>
+            <td><span class="${stockClass}">${stockVal}</span></td>
+            <td style="font-size:0.75rem; color:#333; white-space:normal; line-height:1.3;">${r.UBICACION_COMPLETA}</td>
+            <td style="font-size:0.8rem;">${r.PROVEEDOR || '-'}</td>
+            <td>${extras}</td>
+           </tr>`;
+        }).join('');
+      }
+
+      function verArchivo(url) {
+          const modal = document.getElementById('media-modal');
+          const content = document.getElementById('modal-content');
+          content.innerHTML = `<img src="${url}" onerror="this.src=''; this.parentElement.innerHTML='<p style=color:white>Error al cargar imagen.</p>'">`;
+          modal.style.display = 'flex';
+      }
+
+      function verUbicacion(cuarto, gabinete) {
+        const modal = document.getElementById('media-modal');
+        const content = document.getElementById('modal-content');
+        const nombreCuarto = cuarto ? cuarto.toString().toUpperCase().trim() : "GENERAL";
+        const gKey = gabinete ? gabinete.toString().trim() : "";
+
+        let urlMapa = ""; let coordenadas = {};
+        if (nombreCuarto === "CUARTO 1" || nombreCuarto.includes("ELECTRO")) {
+            urlMapa = "https://imgbob.net/ib/ghZLeqttHSugcMf_1771606048.jpg";
+            coordenadas = { "1": { left: "20%", top: "31%" }, "2": { left: "20%", top: "45%" }, "3": { left: "19%", top: "59%" }, "4": { left: "29%", top: "86%" }, "5": { left: "49%", top: "18%" }, "1A": { left: "19%", top: "72%" }, "2A": { left: "53%", top: "88%" }, "3A": { left: "65%", top: "87%" }, "4A": { left: "76%", top: "78%" }, "5A": { left: "76%", top: "64%" }, "1B": { left: "76%", top: "53%" }, "1C": { left: "76%", top: "43%" }};
+        } else if (nombreCuarto === "CUARTO GUARDIAS") {
+            urlMapa = "https://imgbob.net/ib/t5BmeEfadwVQu5y_1771606303.jpg";
+            coordenadas = { "1": { left: "80%", top: "33%" }, "2": { left: "76%", top: "86%" }, "3": { left: "50%", top: "50%" }, "4": { left: "59%", top: "86%" }, "5": { left: "26%", top: "86%" }, "6": { left: "26%", top: "64%" }, "7": { left: "26%", top: "55%" }, "8": { left: "26%", top: "22%" }};
+        } else if (nombreCuarto === "SALA 6") {
+            urlMapa = "https://imgbob.net/ib/wrcJ36E3sBdaQg2_1771606343.jpg"; coordenadas = { "1": { left: "84%", top: "73%" }, "2": { left: "84%", top: "59%" } };
+        } else if (nombreCuarto === "CUARTO SOLDADORA") {
+            urlMapa = "https://imgbob.net/ib/jrSnyUjMIRqIYv9_1771606424.jpg"; coordenadas = { "1": { left: "89%", top: "54%" } };
+        } else {
+            content.innerHTML = `<div style="background:white; padding:20px; border-radius:8px; text-align:center;"><i class="material-icons" style="font-size:40px; color:#ccc;">map_off</i><p>No hay mapa configurado para:<br><b>${nombreCuarto}</b></p></div>`; modal.style.display = 'flex'; return;
+        }
+
+        const pos = coordenadas[gKey] || { left: "50%", top: "50%" };
+        content.innerHTML = `<div style="width:100%; max-width:600px; margin:0 auto;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><h3 style="color:white; margin:0;">Gabinete <span style="color:#ffb300; font-size:1.4em;">${gKey || '-'}</span></h3><span style="color:#ccc; font-size:0.9rem;">${nombreCuarto}</span></div><div class="map-container"><img src="${urlMapa}" style="width:100%; height:auto; display:block;" onerror="this.parentElement.innerHTML='<p style=color:white;text-align:center;padding:20px>⚠️ Error: Imagen no carga.</p>'"><div class="map-pin" style="left:${pos.left}; top:${pos.top};" title="Gabinete ${gKey}"><div class="pin-pulse"></div></div></div></div>`;
+        modal.style.display = 'flex';
+      }
+
+      function cerrarModal() { document.getElementById('media-modal').style.display = 'none'; document.getElementById('modal-content').innerHTML = ''; }
+
+      function updStockManual() {
+          const idx = document.getElementById('mov-select').value;
+          const i = DB[idx];
+          document.getElementById('mov-stock').innerText = i ? (i.STOCK_ACTUAL||0) : "-";
+      }
+
+      function registrarManual(tipo) {
+          const idx = document.getElementById('mov-select').value;
+          const qty = parseInt(document.getElementById('mov-qty').value);
+          const solicitante = document.getElementById('mov-solicitante').value;
+          const uso = document.getElementById('mov-uso').value;
+
+          if(!idx || qty < 1) return showToast("Selecciona producto y cantidad", "error");
+          const item = DB[idx]; const current = parseInt(item.STOCK_ACTUAL || 0); const next = tipo === 'entrada' ? current + qty : current - qty;
+
+          document.getElementById('loader').style.display='flex';
+          
+          fetch(API_URL, {
+              method: 'POST',
+              body: JSON.stringify({ action: 'updateStockInSheet', sysKey: item.SYS_KEY, newStock: next, tipo: tipo, solicitante: solicitante, uso: uso })
+          }).then(res => res.json()).then(res => {
+              document.getElementById('loader').style.display='none';
+              if(res.status === 'success') {
+                  showToast("Registro Exitoso", "success"); if(res.alertaBajoStock) showToast("⚠️ Stock Bajo", "error");
+                  document.getElementById('mov-stock').innerText = res.newStock; if(DB[idx]) DB[idx].STOCK_ACTUAL = res.newStock; renderTable();
+                  document.getElementById('mov-qty').value = "1"; document.getElementById('mov-solicitante').value = ""; document.getElementById('mov-uso').value = "";
+              } else { showToast("Error: " + res.message, "error"); }
+          }).catch(err => { document.getElementById('loader').style.display='none'; showToast("Error de conexión", "error"); });
+      }
+
+      function toggleSelectAll(source) { document.querySelectorAll('.row-checkbox').forEach(c => c.checked = source.checked); updateFab(); }
+      function updateFab() { const count = document.querySelectorAll('.row-checkbox:checked').length; const fab = document.getElementById('fab-add'); if(count > 0) { fab.style.display = "flex"; document.getElementById('fab-text').innerText = `Agregar ${count}`; } else { fab.style.display = "none"; } }
+      function filtrarTabla() { const v = document.getElementById('search').value.toLowerCase(); document.querySelectorAll('#tabla-main tbody tr').forEach(r => r.style.display = r.innerText.toLowerCase().includes(v) ? '' : 'none'); }
+
+      function agregarSeleccionACola() {
+          const checkboxes = document.querySelectorAll('.row-checkbox:checked'); if(checkboxes.length === 0) return;
+          checkboxes.forEach(chk => { printQueue.push(DB[parseInt(chk.getAttribute('data-idx'))]); chk.checked = false; });
+          document.getElementById('select-all').checked = false; updateFab(); nav('qr', document.querySelectorAll('.nav-btn')[1]); renderQueueList();
+          if(printQueue.length > 0) mostrarVistaPrevia(printQueue.length - 1); showToast("Agregados a cola", "success");
+      }
+
+      function agregarManualACola() {
+          const select = document.getElementById('qr-manual-select'); if(!select.value) return showToast("Selecciona un producto", "error");
+          printQueue.push(DB[select.value]); renderQueueList(); mostrarVistaPrevia(printQueue.length - 1); showToast("Agregado a cola", "success");
+      }
+
+      function renderQueueList() {
+          const container = document.getElementById('queue-list'); document.getElementById('queue-count').innerText = printQueue.length;
+          if(printQueue.length === 0) { container.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">Lista vacía</div>'; document.getElementById('preview-box').style.display='none'; document.getElementById('preview-placeholder').style.display='block'; return; }
+          container.innerHTML = printQueue.map((item, i) => `<div class="queue-item" onclick="mostrarVistaPrevia(${i})"><div style="flex:1;"><span style="font-size:0.9rem;">${i+1}. ${item.NOMBRE.substring(0,25)}...</span><i class="material-icons" style="font-size:16px; color:#aaa; vertical-align:middle; margin-left:5px;">visibility</i></div><button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); printQueue.splice(${i}, 1); renderQueueList();">X</button></div>`).join('');
+      }
+
+      function mostrarVistaPrevia(index) {
+          if(!printQueue[index]) return; const item = printQueue[index];
+          document.querySelectorAll('.queue-item').forEach(el => el.classList.remove('selected')); if(document.querySelectorAll('.queue-item')[index]) document.querySelectorAll('.queue-item')[index].classList.add('selected');
+          document.getElementById('preview-placeholder').style.display = 'none'; document.getElementById('preview-box').style.display = 'block';
+          document.getElementById('prev-name').innerText = item.NOMBRE; document.getElementById('prev-id').innerText = `ID: ${item.ID_TERNIUM}`; document.getElementById('prev-qr').innerHTML = ""; new QRCode(document.getElementById('prev-qr'), { text: item.CODIGO_INTERNO, width: 120, height: 120 });
+      }
+
+      function limpiarCola() { printQueue = []; renderQueueList(); }
+
+      function imprimirCola() {
+          if(printQueue.length === 0) return showToast("Cola vacía", "error"); const grid = document.getElementById('print-grid'); grid.innerHTML = "";
+          printQueue.forEach(item => {
+              const card = document.createElement('div'); card.className = "print-label-card"; const nameEl = document.createElement('div'); nameEl.className = "print-name"; nameEl.innerText = item.NOMBRE;
+              const qrContainer = document.createElement('div'); qrContainer.className = "print-qr"; new QRCode(qrContainer, { text: item.CODIGO_INTERNO, width: 100, height: 100 });
+              const idEl = document.createElement('div'); idEl.className = "print-id"; idEl.innerText = `ID: ${item.ID_TERNIUM}`;
+              card.appendChild(nameEl); card.appendChild(qrContainer); card.appendChild(idEl); grid.appendChild(card);
+          });
+          setTimeout(() => window.print(), 500);
+      }
+
+      function exportar() {
+          showToast("Preparando archivo...", "success");
+          fetch(API_URL + "?action=exportarCSV").then(res => res.json()).then(r => { 
+            if(r.status==='success'){ const a=document.createElement('a'); a.href="data:text/csv;base64,"+r.data; a.download=r.filename; a.click(); } else { showToast("Error exportando", "error"); }
+          }).catch(e => showToast("Error de conexión al exportar", "error"));
+      }
+
+      // =========================================================
+      // CÁMARA LIBRE DE IFRAMES
+      // =========================================================
+      function restaurarBotonesCamara() {
+        document.getElementById('btn-scan').style.display='inline-block'; document.getElementById('btn-stop').style.display='none';
+      }
+
+      function iniciarCamara() {
+        document.getElementById('scan-card').style.display='none'; document.getElementById('btn-scan').style.display='none'; document.getElementById('btn-stop').style.display='inline-block';
+        
+        scanner = new Html5Qrcode("reader");
+        scanner.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 250 } }, 
+            onScan
+        ).catch(err => {
+            console.error("Error iniciando cámara:", err); showToast("Acepta los permisos de cámara.", "error"); restaurarBotonesCamara();
+        });
+      }
+
+      function detenerCamara() {
+        if(scanner) scanner.stop().catch(e => console.log(e)).finally(() => document.getElementById('reader').innerHTML = "");
+        restaurarBotonesCamara();
+      }
+
+      function onScan(text) {
+         beep(); detenerCamara();
+         let detectedCode = text.startsWith("V1|") ? text.split("|")[1] : text;
+         let foundIndex = DB.findIndex(i => i.CODIGO_INTERNO === detectedCode || i.ID_TERNIUM === detectedCode); scannedIdx = foundIndex;
+         
+         if (foundIndex !== -1) {
+             const itemLocal = DB[foundIndex]; mostrarFicha(itemLocal);
+             fetch(API_URL + "?action=obtenerDatosTiempoReal&codigo=" + encodeURIComponent(itemLocal.CODIGO_INTERNO)).then(res => res.json()).then(res => {
+                 if(res.error) { showToast(res.error, 'error'); return; }
+                 document.getElementById('card-stock').innerText = res.stock; document.getElementById('card-loc').innerText = res.ubicacion;
+                 document.getElementById('btn-in').disabled = false; document.getElementById('btn-out').disabled = false;
+             });
+         } else { showToast("Producto no encontrado", "error"); setTimeout(iniciarCamara, 1500); }
+      }
+
+      function mostrarFicha(item) {
+         document.getElementById('scan-card').style.display='block'; document.getElementById('card-name').innerText = item.NOMBRE;
+         document.getElementById('card-id').innerText = item.ID_TERNIUM; document.getElementById('card-stock').innerText = "..."; document.getElementById('card-loc').innerText = "Verificando...";
+         document.getElementById('btn-in').disabled = true; document.getElementById('btn-out').disabled = true;
+         const linkDS = document.getElementById('link-datasheet'); if(item.DATASHEET && item.DATASHEET.length > 5) { linkDS.href = item.DATASHEET; linkDS.style.display = "inline-block"; } else { linkDS.style.display = "none"; }
+      }
+
+      function adjCant(n) { const el = document.getElementById('scan-qty'); let v = parseInt(el.value) + n; if(v < 1) v = 1; el.value = v; }
+
+      function registrarDesdeScanner(tipo, btn) {
+          const stockText = document.getElementById('card-stock').innerText;
+          if (isNaN(parseInt(stockText))) { showToast("Espera a que cargue el stock actual", "error"); return; }
+          const qty = parseInt(document.getElementById('scan-qty').value); const solicitante = document.getElementById('scan-solicitante').value; const uso = document.getElementById('scan-uso').value;
+          const item = DB[scannedIdx]; btn.disabled = true; btn.innerText = "...";
+          
+          fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateStockInSheet', sysKey: item.SYS_KEY, newStock: parseInt(stockText) + (tipo==='entrada'?qty:-qty), tipo: tipo, solicitante: solicitante, uso: uso })
+          }).then(res => res.json()).then(res => {
+              if(res.status === 'success') {
+                  showToast("Movimiento registrado", "success"); document.getElementById('card-stock').innerText = res.newStock; if(res.alertaBajoStock) showToast("⚠️ Stock Bajo", "error");
+                  item.STOCK_ACTUAL = res.newStock; document.getElementById('scan-solicitante').value = ""; document.getElementById('scan-uso').value = ""; loadData(); 
+              } else { showToast("Error: " + res.message, "error"); }
+              btn.disabled = false; btn.innerText = (tipo==='entrada'?'Entrada (+)':'Salida (-)');
+          }).catch(e => { showToast("Error de conexión", "error"); btn.disabled = false; btn.innerText = (tipo==='entrada'?'Entrada (+)':'Salida (-)'); });
+      }
+
+      function handleAlta(e) {
+          e.preventDefault(); const d = {}; new FormData(e.target).forEach((v,k)=>d[k]=v); document.getElementById('loader').style.display='flex';
+          fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'crearNuevoArticulo', form: d }) }).then(res => res.json()).then(res => {
+             document.getElementById('loader').style.display='none';
+             if(res.status === 'success') { showToast("Artículo Creado", "success"); e.target.reset(); document.getElementById("alta-gabinete").innerHTML = '<option value="" disabled selected>-- Gabinete --</option>'; loadData(); 
+             } else { showToast("Error: " + res.message, "error"); }
+          }).catch(err => { document.getElementById('loader').style.display='none'; showToast("Error de conexión", "error"); });
+      }
+
+      const gabinetesPorCuarto = { "Cuarto 1": ["1", "2", "3", "4", "5", "1A", "2A", "3A", "4A", "5A", "1B", "1C"], "Cuarto Guardias": ["1", "2", "3", "4", "5", "6", "7", "8"], "Sala 6": ["1", "2"], "Cuarto soldadora": ["1"] };
+      function actualizarGabinetes() {
+          const cuartoSeleccionado = document.getElementById("alta-cuarto").value; const selectGabinete = document.getElementById("alta-gabinete"); selectGabinete.innerHTML = '<option value="" disabled selected>-- Gabinete --</option>';
+          if (gabinetesPorCuarto[cuartoSeleccionado]) { gabinetesPorCuarto[cuartoSeleccionado].forEach(gab => { const opt = document.createElement("option"); opt.value = gab; opt.textContent = gab; selectGabinete.appendChild(opt); });
+          } else { const opt = document.createElement("option"); opt.value = "-"; opt.textContent = "Gral / Único"; selectGabinete.appendChild(opt); }
+      }
+    </script>
+  </body>
+</htmle
